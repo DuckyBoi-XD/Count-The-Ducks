@@ -54,6 +54,9 @@ elif os.name == 'posix':
 else:
     OS = "Unknown"
 
+#----Preloaded variables----#
+FILE_STATUS = None
+
 #--Save File Money--#
 
 #-Binary Encoder-#
@@ -102,29 +105,33 @@ def decode_save(encoded_bytes):
 
 def get_config_dir():
     '''Return platform-appropriate config directory'''
-    return os.path.expanduser("~/.config/ride-the-duck")                        #CHANGE NAME
+    return os.path.expanduser("~/.config/counting-ducks")                        #CHANGE NAME
 
 def load_game(): # access save file JSON
     '''loading save file - returns both money and name'''
+    global FILE_STATUS
     config_dir = get_config_dir()
-    save_path = os.path.join(config_dir, "DuckCountSaveFile.bin")                 #CHANGE GAME NAME
+    save_path = os.path.join(config_dir, "CountingDucksSaveFile.bin")                 #CHANGE GAME NAME
     try:
         with open(save_path, "rb") as f:                                           #ADD ITEMS TO SAVE FILE
             encoded_bytes = f.read()
             json_str = decode_save(encoded_bytes)
             data = json.loads(json_str)
+            FILE_STATUS = 1
             return (data.get("money", 500),
                     data.get("name", None),
                     data.get("games played", 0),
                     data.get("money earnt", 0),
                     data.get("money lost", 0),
-                    data.get("Broke count", 0))
+                    data.get("money borrowed", 0))
     except FileNotFoundError:
-        return 500, None, 0, 0, 0, 0                                                  #ADD ITEMS TO SAVE FILE
+        FILE_STATUS = 2
+        return 500, None, 0, 0, 0, 0                                               #ADD ITEMS TO SAVE FILE
     except (ValueError, json.JSONDecodeError) as error:
+        FILE_STATUS = 3
         return 500, None, 0, 0, 0, 0                                                  #ADD ITEMS TO SAVE FILE
 
-def save_game(money=None, name=None, game_played=None, money_earnt=None, money_lost=None, broke_count=None):               #ADD ITEMS TO SAVE FILE
+def save_game(money=None, name=None, game_played=None, money_earnt=None, money_lost=None, money_borrowed=None):               #ADD ITEMS TO SAVE FILE
     '''saving game data'''
     if money is None:
         money = USER_WALLET
@@ -136,21 +143,21 @@ def save_game(money=None, name=None, game_played=None, money_earnt=None, money_l
         money_earnt = MONEY_EARNT
     if money_lost is None:
         money_lost = MONEY_LOST
-    if broke_count is None:
-        broke_count = BROKE_COUNT
+    if MONEY_BORROWED is None:
+        money_borrowed = MONEY_BORROWED
     data = {
         "money": money,
         "name": name,
         "games played": game_played,
         "money earnt": money_earnt,
         "money lost": money_lost,
-        "Broke count": broke_count
+        "money borrowed": MONEY_BORROWED
     }
     json_str = json.dumps(data)
     encoded_bytes = encode_save(json_str)
     config_dir = get_config_dir()
     os.makedirs(config_dir, exist_ok=True)
-    save_path = os.path.join(config_dir, "DuckCountSaveFile.bin")                   #CHANGE NAME
+    save_path = os.path.join(config_dir, "CountingDucksSaveFile.bin")                   #CHANGE NAME
     with open(save_path, "wb") as f:
         f.write(encoded_bytes)
 #--Save File Money--#
@@ -158,7 +165,7 @@ def save_game(money=None, name=None, game_played=None, money_earnt=None, money_l
 #----Preloaded function----#
 
 #---Variables---#
-USER_WALLET, USER_NAME, GAMES_PLAYED, MONEY_EARNT, MONEY_LOST, BROKE_COUNT = load_game()  # Load both money and name from save file
+USER_WALLET, USER_NAME, GAMES_PLAYED, MONEY_EARNT, MONEY_LOST, MONEY_BORROWED = load_game()  # Load both money and name from save file
 CARD_SUITS = ("♠", "♦", "♥", "♣") # creates suits for card deck creation
 USER_NAME_KNOWLEDGE = False
 
@@ -219,9 +226,9 @@ def LINE():
 
 def clear_screen():
     ''''clear screen function'''
-    if OS == 'Unix':
+    if os.name == 'posix':
         os.system('clear')
-    elif OS == 'Windows':
+    elif os.name == 'posix':
         os.system('cls')
 
 def is_float(variable):
@@ -249,3 +256,261 @@ def print_tw(sentence, type_delay=0.01):
     sys.stdout.write('\n')
     sys.stdout.flush()
 #----Function Variables----#
+
+#----Card Deck----#
+CardDeck = {}
+
+for suit in CARD_SUITS:
+    for value_card in range(2, 11):
+        CardDeck[f"{value_card}{suit}"] = value_card
+
+for suit in CARD_SUITS:
+    CardDeck[f"D{suit}"] = 11
+    CardDeck[f"Q{suit}"] = 12
+    CardDeck[f"K{suit}"] = 13
+    CardDeck[f"A{suit}"] = 14
+#----Card Deck----#
+
+#----Single Key Track----#
+def key_press(option):
+    """Waits for a single key press"""
+    try:
+        if option == 0:
+            print(f"{Colours.RED}Press any key to continue{Colours.RESET}")
+        elif option == 1:
+            print(f"{Colours.RED}Press any key to return to menu{Colours.RESET}")
+
+        if os.name == "nt":
+            msvcrt.getwch()
+        else:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return True
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+#----Single Key Track----#
+
+#----Arrow Key Track----#
+def arrow_key():
+    """Read one key or arrow key"""
+    try:
+        if os.name == "nt":
+            ch = msvcrt.getwch()
+            if ch and ord(ch) == 3:
+                print(f"\n{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+                sys.exit()
+            if ch in ("\x00", "\xe0"):
+                ch2 = msvcrt.getwch()
+                win_map = {
+                    "H": "\x1b[A",  # up
+                    "P": "\x1b[B",  # down
+                    "M": "\x1b[C",  # right
+                    "K": "\x1b[D",  # left
+                }
+                return win_map.get(ch2, ch + ch2)
+            if ch == "\r":
+                return "\r"
+            return ch
+
+        elif os.name == "posix":
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                key = sys.stdin.read(1)
+
+                if ord(key) == 3:  # CTRL-C
+                    print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")                    #
+                    sys.exit()
+                elif ord(key) == 4:  # CTRL-D
+                    print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+                    sys.exit()
+
+                if ord(key) == 27:  # ESC
+                    # read the next two chars (typical ANSI arrow seq)
+                    key += sys.stdin.read(2)
+                return key
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+#----Arrow Key Track----#
+
+#----Arrow Key Menu System----#
+def arrow_menu(title, text, options):
+    """generic arrow key menu system"""
+    try:
+        selected = 0
+        while True:
+            clear_screen()
+            LINE()
+            #Game information
+            LINE()
+            #Text above options
+                
+            # Display menu options
+            for i, option in enumerate(options):
+                if i == selected:
+                    print(f"{Colours.BOLD}{Colours.YELLOW}► {option}{Colours.RESET}")
+                else:
+                    print(f"{Colours.WHITE}  {option}{Colours.RESET}")
+            LINE()
+            key = arrow_key()
+            
+            # Handle arrow keys and other inputs for Unix/macOS
+            if len(key) > 1:
+                if key == '\x1b[A':  # Up arrow
+                    selected = (selected - 1) % len(options)
+                elif key == '\x1b[B':  # Down arrow
+                    selected = (selected + 1) % len(options)
+                elif ord(key[0]) == 13:  # Enter
+                    return selected
+                elif len(key) == 1 and ord(key) == 27:  # ESC alone
+                    return -1
+            elif len(key) == 1:
+                if key.lower() == 'w':  # W key - up
+                    selected = (selected - 1) % len(options)
+                elif key.lower() == 's':  # S key - down
+                    selected = (selected + 1) % len(options)
+                elif key == '\r' or key == '\n':  # Enter
+                    return selected
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+
+#----Arrow Key Menu System----#
+
+#----Start Game----#
+def start_game():
+    '''start of game info'''
+    try:
+        clear_screen()
+        LINE()
+        print(f"{Colours.BOLD}{Colours.BLUE}🎰 Counting Ducks 🎰{Colours.RESET}\n")
+        if FILE_STATUS == 1:
+            f"{Colours.BOLD}{Colours.GREEN}💾 Loaded Save File"
+        elif FILE_STATUS == 2:
+            f"{Colours.BOLD}{Colours.YELLOW}💾 New Save File"
+        elif FILE_STATUS == 2:
+            f"{Colours.BOLD}{Colours.RED}💾 Corrupted or Tamppered Savee File"
+        print(f"{Colours.GREEN}💰 Your Money: ${USER_WALLET}{Colours.RESET}\n"
+        f"{Colours.CYAN}🎉 Welcome to Counting Ducks, a gambling game 🎉{Colours.RESET}")
+        if USER_NAME is None:
+            print(f"{Colours.YELLOW}🏷️  Your  Name:{Colours.RESET}{Colours.RED} -UNKNOWN-{Colours.RESET}")
+        else:
+            print(f"{Colours.YELLOW}🏷️  Your  Name:{Colours.RESET} {USER_NAME}")
+        LINE()
+        key_press(1)
+        clear_screen()
+    except KeyboardInterrupt:
+        print(f"{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+    except EOFError:
+        print(f"{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit() 
+#----Start Game----#
+
+#----financial aid----#
+def financial_aid():
+    """Function to output the last message after losing all your money"""
+    global USER_WALLET
+    global MONEY_BORROWED
+    MONEY_BORROWED + 100
+    clear_screen()
+    try:
+        clear_screen()
+        LINE()
+        print(f"{Colours.BOLD}{Colours.BLUE}🏷️  RIDE THE DUCK - FINANCIAL AID 🏷️{Colours.RESET}")
+        LINE()
+        print(f"{Colours.YELLOW}Due to you being {Colours.RED}BROKE{Colours.RESET}{Colours.YELLOW}, you are given {Colours.RESET}{Colours.GREEN}$10{Colours.RESET} {Colours.YELLOW}to hopefully sustain your gambling addiction\n")
+        USER_WALLET += 10
+        print(f"{Colours.GREEN}You now have ${USER_WALLET}{Colours.RESET}")
+        print(f"{Colours.RED}You have borrowed a total of ${MONEY_BORROWED}")
+        LINE()
+        save_game()
+        key_press(1)
+    except KeyboardInterrupt:
+        print(f"{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+    except EOFError:
+        print(f"{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+#----financial aid----#
+
+#----Betting Check Function----#
+def bet_check():
+    '''betting check'''
+    clear_screen()
+    try:
+        global user_bet
+        global USER_WALLET
+        global bet_confirm
+        global bet_amount
+        if USER_WALLET <= 0:
+            financial_aid()
+            return
+        else:
+            bet_error = 0
+            user_bet = None
+            bet_confirm = False
+            while True:
+                clear_screen()
+                LINE()
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 RIDE THE DUCK - MAIN GAME - BET 🎰{Colours.RESET}")
+                LINE()
+
+                if bet_error == 1:
+                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet} - Please use a number ⚠️{Colours.RESET}")
+                elif bet_error == 2:
+                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet} - Please enter a number equal or bigger than 0.01 ⚠️{Colours.RESET}")
+                elif bet_error == 3:
+                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet} - You are betting more money than you have in your wallet ⚠️{Colours.RESET}")
+
+                print(f"{Colours.GREEN}💰 Your Money: ${USER_WALLET}{Colours.RESET}\n"
+                    f"{Colours.CYAN}💵  How much do you want to bet? (Min $0.01) 💵{Colours.RESET}")
+                bet_error = 0
+                try:
+                    user_bet = input(f"{Colours.BOLD}❯ {Colours.RESET}").strip()
+                except (KeyboardInterrupt, EOFError):
+                    print(f"\n{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+                    sys.exit()
+                
+                if is_float(user_bet):
+                    if money_valid(user_bet) and float(user_bet) >= 0.01:
+                        if float(user_bet) <= USER_WALLET:
+                            clear_screen()
+                            choices = arrow_menu("menu",
+                                f"{Colours.GREEN}💵 You are betting: {Colours.WHITE}${user_bet}{Colours.RESET}\n{Colours.CYAN}✅ Please confirm bet amount ✅{Colours.RESET}\n",
+                                Confirm_Redo_Cancel)
+                            if choices == 0:
+                                clear_screen()
+                                bet_confirm = True
+                                USER_WALLET -= float(user_bet)
+                                bet_amount = float(user_bet)
+                                break
+                            elif choices == 1:
+                                clear_screen()
+                            elif choices == 2:
+                                clear_screen()
+                                break
+                        else:
+                            bet_error = 3
+                            clear_screen()
+                    else:
+                        bet_error = 2
+                        clear_screen()
+                else:
+                    bet_error = 1
+                    clear_screen()
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Colours.RED}Thanks for playing Ride The Duck{Colours.RESET}")
+        sys.exit()
+
+#----Betting check Function----#
