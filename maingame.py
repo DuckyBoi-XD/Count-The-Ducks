@@ -133,15 +133,29 @@ def load_game(): # access save file JSON
                     data.get("games played", 0),
                     data.get("money earnt", 0),
                     data.get("money lost", 0),
-                    data.get("money borrowed", 0))
+                    data.get("money borrowed", 0),
+                    data.get("card roulette wins", 0),
+                    data.get("card roulette loses", 0),
+                    data.get("highs and lows wins", 0),
+                    data.get("highs and lows wins", 0),
+                    )
     except FileNotFoundError:
         FILE_STATUS = 2
-        return 500, None, 0, 0, 0, 0                                               #ADD ITEMS TO SAVE FILE
+        return 500, None, 0, 0, 0, 0, 0, 0, 0, 0                                               #ADD ITEMS TO SAVE FILE
     except (ValueError, json.JSONDecodeError):
         FILE_STATUS = 3
-        return 500, None, 0, 0, 0, 0                                                  #ADD ITEMS TO SAVE FILE
+        return 500, None, 0, 0, 0, 0, 0, 0, 0, 0                                                  #ADD ITEMS TO SAVE FILE
 
-def save_game(money=None, name=None, game_played=None, money_earnt=None, money_lost=None, money_borrowed=None):               #ADD ITEMS TO SAVE FILE
+def save_game(money=None,
+            name=None,
+            game_played=None,
+            money_earnt=None,
+            money_lost=None,
+            money_borrowed=None,
+            card_roulette_wins=None,
+            card_roulette_loses=None,
+            highs_and_lows_wins=None,
+            highs_and_lows_loses=None):               #ADD ITEMS TO SAVE FILE - add CR DR CG win tracking
     '''saving game data'''
     if money is None:
         money = USER_WALLET
@@ -155,6 +169,14 @@ def save_game(money=None, name=None, game_played=None, money_earnt=None, money_l
         money_lost = MONEY_LOST
     if money_borrowed is None:
         money_borrowed = MONEY_BORROWED
+    if card_roulette_wins is None:
+        card_roulette_wins = CARD_ROULETTE_WINS
+    if card_roulette_loses is None:
+        card_roulette_loses = CARD_ROULETTE_LOSES
+    if highs_and_lows_wins is None:
+        highs_and_lows_wins = HIGHS_AND_LOWS_WINS
+    if highs_and_lows_loses is None:
+        highs_and_lows_loses = HIGHS_AND_LOWS_LOSES
     data = {
         "money": money,
         "name": name,
@@ -167,7 +189,7 @@ def save_game(money=None, name=None, game_played=None, money_earnt=None, money_l
     encoded_bytes = encode_save(json_str)
     config_dir = get_config_dir()
     os.makedirs(config_dir, exist_ok=True)
-    save_path = os.path.join(config_dir, "CountingDucksSaveFile.bin")                   #CHANGE NAME
+    save_path = os.path.join(config_dir, "CountingDucksSaveFile.bin")
     with open(save_path, "wb") as f:
         f.write(encoded_bytes)
 #--Save File Money--#
@@ -175,11 +197,13 @@ def save_game(money=None, name=None, game_played=None, money_earnt=None, money_l
 #----Preloaded function----#
 
 #---Variables---#
-USER_WALLET, USER_NAME, GAMES_PLAYED, MONEY_EARNT, MONEY_LOST, MONEY_BORROWED = load_game()  # Load both money and name from save file
+USER_WALLET, USER_NAME, GAMES_PLAYED, MONEY_EARNT, MONEY_LOST, MONEY_BORROWED, CARD_ROULETTE_WINS, CARD_ROULETTE_LOSES, HIGHS_AND_LOWS_WINS, HIGHS_AND_LOWS_LOSES = load_game()  # Load both money and name from save file
 CARD_SUITS = ("♠", "♦", "♥", "♣") # creates suits for card deck creation
 USER_NAME_KNOWLEDGE = False
+CURRENT_GAME = 0 #1 = CR    2 = HL
 
 Confirm_Redo = ["✅ Confirm", "🔄 Redo"]
+Confirm_Cancel = ["✅ Confirm", "❌ Cancel"]
 Confirm_Redo_Cancel = ["✅ Confirm", "🔄 Redo", "❌ Cancel"]
 
 card_output = ""
@@ -187,10 +211,120 @@ bet_amount = None
 user_bet = None
 bet_confirm = False
 
-RedBlackPick = [
-    "🟥 Red",
-    "⬛ Black"
-    ]
+CRPick = [
+    "🟥 ⬛ Card Colour",
+    "♠️ ♦️ ♣️ ♥️ Card Suit",
+    "👑 A 🔟 Group cards",
+    "🃏 Certain Cards",
+    "🃏 ♠️ ♦️ ♣️ ♥️ Specific Cards",
+    "❌ Quit Game"
+
+]
+CRRedBlackPick = [
+    f"🟥 Red Cards {Colours.GREEN}x2{Colours.RESET} {Colours.YELLOW}[50%]{Colours.RESET}",
+    f"⬛ Black Cards {Colours.GREEN}x2{Colours.RESET} {Colours.YELLOW}[50%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRSuitsPick = [
+    f"♠️ Spades {Colours.GREEN}x4{Colours.RESET} {Colours.YELLOW}[25%]{Colours.RESET}",
+    f"♦️ Diamonds {Colours.GREEN}x4{Colours.RESET} {Colours.YELLOW}[25%]{Colours.RESET}",
+    f"♥️ Hearts {Colours.GREEN}x4{Colours.RESET} {Colours.YELLOW}[25%]{Colours.RESET}",
+    f"♣️ Clubs {Colours.GREEN}x4{Colours.RESET} {Colours.YELLOW}[25%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRGroupPick = [
+    f"👑 Face Cards {Colours.GREEN}x5{Colours.RESET} {Colours.YELLOW}[23.08%]{Colours.RESET}",
+    f"🔟 Number Cards {Colours.GREEN}x1.5{Colours.RESET} {Colours.YELLOW}[76.92%]{Colours.RESET}",
+    f"A Ace Card {Colours.GREEN}x25{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRCertainPick = [ #This can be done way more simpler but it eaiser to see all the options
+    f"2 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"3 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"4 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"5 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"6 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"7 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"8 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"9 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"10 {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"Duck {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"Queen {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"King {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"Ace {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRSpecificPick = [
+    "♠️ Spades",
+    "♦️ Diamonds",
+    "♥️ Hearts",
+    "♣️ Clubs",
+    "↩️ Back"
+]
+CRSuitsSpades = [
+    f"2 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"3 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"4 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"5 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"6 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"7 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"8 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"9 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"10 ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Duck ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Queen ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"King ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Ace ♠️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRSuitsDiamonds = [
+    f"2 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"3 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"4 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"5 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"6 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"7 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"8 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"9 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"10 ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Duck ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Queen ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"King ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Ace ♦️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRSuitsHearts = [
+    f"2 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"3 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"4 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"5 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"6 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"7 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"8 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"9 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"10 ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Duck ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Queen ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"King ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Ace ♥️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    "↩️ Back"
+]
+CRSuitsClubs = [
+    f"2 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"3 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"4 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"5 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"6 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"7 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"8 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"9 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"10 ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Duck ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Queen ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"King ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    f"Ace ♣️ {Colours.GREEN}x20{Colours.RESET} {Colours.YELLOW}[1.92%]{Colours.RESET}",
+    "↩️ Back"
+]
 PlayOptions = [
     "🔄 Play Again",
     "🎰 Menu"
@@ -363,7 +497,20 @@ def arrow_menu(title, text, options):
         while True:
             clear_screen()
             LINE()
-            print(title)
+            if title is "gameCR":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - CARD ROULETTE 🎰{Colours.RESET}")
+            elif title is "gameCRRedBlack":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - CARD ROULETTE - CARD COLOUR PICK🎰{Colours.RESET}")
+            elif title is "gameHL":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - HIGHS AND LOWS 🎰{Colours.RESET}")
+            elif title is "confirm-cancel":
+                if CURRENT_GAME == 1:
+                    print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - CARD ROULETTE - CONFIRM 🎰{Colours.RESET}")
+                elif CURRENT_GAME == 2:
+                    print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - HIGHS AND LOWS - CONFIRM 🎰{Colours.RESET}")
+            elif title is "menu":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - MENU 🎰{Colours.RESET}")
+
             LINE()
             print(text)
                 
@@ -538,7 +685,6 @@ def name_pick():
                 print(f"{Colours.RED}(You can change this later){Colours.RESET}")
             elif USER_NAME_KNOWLEDGE is True:
                 pass
-            
             try:
                 USER_NAME = input(f"{Colours.BOLD}❯ {Colours.RESET}")
             except (KeyboardInterrupt, EOFError):
@@ -568,8 +714,9 @@ def help_game():
         print(f"{Colours.BOLD}{Colours.BLUE}❓  COUNTING DUCKS - HELP ❓{Colours.RESET}")
         LINE()
 
-        print(f"{Colours.YELLOW}\"Counting Ducks\" is a containing multiple games inspired other casino games.\n\n{Colours.RESET}" \
-            f"The Jack cards are also replaced by Ducks"
+        print(f"{Colours.CYAN}\"Counting Ducks\" is a game containing multiple games inspired other casino games.\n\n{Colours.RESET}"
+            f"{Colours.RED}IMPORTANT:{Colours.RESET} The {Colours.YELLOW}Jack{Colours.RESET} cards are replaced by {Colours.YELLOW}Ducks{Colours.RESET}"
+            "In the first game, Card Roulette, when picking what type of card to bet on, you many need to choose multiple catagories"
         )
         LINE()
         key_press(1)
@@ -601,32 +748,101 @@ def show_stats():
         sys.exit()
 #----Stats----#
 
+#----Game 1 - card roulette----#
+def card_roulette():
+    """First game"""
+    global USER_WALLET, user_bet
+    try:
+        while True:
+            choices = arrow_menu("gameCR", (f"{Colours.CYAN}Pick what you would like to bet your ${user_bet} on{Colours.RESET}\n"), CRPick)
+            if choices == 0: # Card colour
+                choices = arrow_menu("gameCRRedBlack", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}colour{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRRedBlackPick)
+                if choices == 0:
+                    BetPick = "RED"
+                elif choices == 1:
+                    BetPick = "BLACK"
+                elif choices == 2 or choices == -1:
+                    continue
+                else:
+                    continue
+            elif choices == 1: # Card Suits
+                choices = arrow_menu("gameCRSuits", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}suit{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRSuitsPick)
+                if choices == 0:
+                    BetPick == "SPADE"
+                elif choices == 1:
+                    BetPick == "DIAMOND"
+                elif choices == 2:
+                    BetPick == "HEART"
+                elif choices == 3:
+                    BetPick == "CLUB"
+                elif choices == 4 or choices == -1:
+                    continue
+                else:
+                    continue
+            elif choices == 2: # Card Groups
+                choices = arrow_menu("gameCRGroups", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}group{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRGroupPick)
+
+            elif choices == 3: # Certain card
+                choices = arrow_menu("gameCRCertain", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}value{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRCertainPick)
+
+            elif choices == 4: # Specific card
+                choices = arrow_menu("gameCRSpecific", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}card{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRSpecificPick)
+                
+            elif choices == 5: # Exit Game
+                USER_WALLET += user_bet
+                user_bet = None
+                break
+            else: # Exit game 
+                USER_WALLET += user_bet
+                user_bet = None
+                return
+            clear_screen()
+        else:
+            return
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        sys.exit()
+#----Game 1 - card roulette----#
+
+#----Game 2 - Highs and Lows----#
+
+
+
+
+
+#----Game 2 - Highs and Lows----#
+
 #----Main Menu----#
 def main_menu():
     """Main game menu with arrow navigation"""
     try:
         options = [
-            "🎮 Play insert game 1",
-            "🎮 Play insert game 2"
+            "🎮 Play Card Roulette",                                                #CHANE GAME NAMES
+            "🎮 Play High of Lows",
             "📊 View Statistics",
             "❓ Help", 
             "✏️  Change Name",
             "💾 Save Game",
             "🚪 Quit Game"
         ]
+        global CURRENT_GAME
         while True:
             if USER_WALLET <= 0:
                 financial_aid()
                 continue
             else:
-                clear_screen()  # Clear screen for smooth menu display
+                clear_screen()
                 
                 choice = arrow_menu("menu", None, options)
                 
-                if choice == 0:  # Play first game
+                if choice == 0:  # Play Card roulette game
                     clear_screen()                                                  # GAME 1
-                elif choice == 1: # Play second game
+                    CURRENT_GAME = 1
+                    choice = arrow_menu("confirm-cancel", (f"{Colours.CYAN}Please confirm to play Card Roulette{Colours.RESET}\n"), Confirm_Cancel)
+                elif choice == 1: # Play Highs and Lows game
                     clear_screen()                                                  # GAME 2
+                    CURRENT_GAME = 2
+                    choice = arrow_menu("confirm-cancel", (f"{Colours.CYAN}Please confirm to play Highs and Lows{Colours.RESET}\n"), Confirm_Cancel)
                 elif choice == 2:  # View Stats
                     clear_screen()
                     show_stats()
