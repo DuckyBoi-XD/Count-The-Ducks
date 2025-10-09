@@ -115,13 +115,13 @@ def decode_save(encoded_bytes):
 
 def get_config_dir():
     '''Return platform-appropriate config directory'''
-    return os.path.expanduser("~/.config/counting-ducks")                        #CHANGE NAME
+    return os.path.expanduser("~/.config/duck-roulette")                        #CHANGE NAME
 
 def load_game(): # access save file JSON
     '''loading save file - returns both money and name'''
     global FILE_STATUS
     config_dir = get_config_dir()
-    save_path = os.path.join(config_dir, "CountingDucksSaveFile.bin")                 #CHANGE GAME NAME
+    save_path = os.path.join(config_dir, "DuckRouletteSaveFile.bin")                 #CHANGE GAME NAME
     try:
         with open(save_path, "rb") as f:                                           #ADD ITEMS TO SAVE FILE
             encoded_bytes = f.read()
@@ -136,15 +136,13 @@ def load_game(): # access save file JSON
                     data.get("money borrowed", 0),
                     data.get("card roulette wins", 0),
                     data.get("card roulette loses", 0),
-                    data.get("highs and lows wins", 0),
-                    data.get("highs and lows wins", 0),
                     )
     except FileNotFoundError:
         FILE_STATUS = 2
-        return 500, None, 0, 0, 0, 0, 0, 0, 0, 0                                               #ADD ITEMS TO SAVE FILE
+        return 500, None, 0, 0, 0, 0, 0, 0                                              #ADD ITEMS TO SAVE FILE
     except (ValueError, json.JSONDecodeError):
         FILE_STATUS = 3
-        return 500, None, 0, 0, 0, 0, 0, 0, 0, 0                                                  #ADD ITEMS TO SAVE FILE
+        return 500, None, 0, 0, 0, 0, 0, 0                                               #ADD ITEMS TO SAVE FILE
 
 def save_game(money=None,
             name=None,
@@ -153,9 +151,8 @@ def save_game(money=None,
             money_lost=None,
             money_borrowed=None,
             card_roulette_wins=None,
-            card_roulette_loses=None,
-            highs_and_lows_wins=None,
-            highs_and_lows_loses=None):               #ADD ITEMS TO SAVE FILE - add CR DR CG win tracking
+            card_roulette_loses=None
+            ):
     '''saving game data'''
     if money is None:
         money = USER_WALLET
@@ -173,23 +170,21 @@ def save_game(money=None,
         card_roulette_wins = CARD_ROULETTE_WINS
     if card_roulette_loses is None:
         card_roulette_loses = CARD_ROULETTE_LOSES
-    if highs_and_lows_wins is None:
-        highs_and_lows_wins = HIGHS_AND_LOWS_WINS
-    if highs_and_lows_loses is None:
-        highs_and_lows_loses = HIGHS_AND_LOWS_LOSES
     data = {
         "money": money,
         "name": name,
         "games played": game_played,
         "money earnt": money_earnt,
         "money lost": money_lost,
-        "money borrowed": money_borrowed
+        "money borrowed": money_borrowed,
+        "card roulette wins": card_roulette_wins,
+        "card roulette loses": card_roulette_loses
     }
     json_str = json.dumps(data)
     encoded_bytes = encode_save(json_str)
     config_dir = get_config_dir()
     os.makedirs(config_dir, exist_ok=True)
-    save_path = os.path.join(config_dir, "CountingDucksSaveFile.bin")
+    save_path = os.path.join(config_dir, "DuckRouletteSaveFile.bin")
     with open(save_path, "wb") as f:
         f.write(encoded_bytes)
 #--Save File Money--#
@@ -197,10 +192,9 @@ def save_game(money=None,
 #----Preloaded function----#
 
 #---Variables---#
-USER_WALLET, USER_NAME, GAMES_PLAYED, MONEY_EARNT, MONEY_LOST, MONEY_BORROWED, CARD_ROULETTE_WINS, CARD_ROULETTE_LOSES, HIGHS_AND_LOWS_WINS, HIGHS_AND_LOWS_LOSES = load_game()  # Load both money and name from save file
+USER_WALLET, USER_NAME, GAMES_PLAYED, MONEY_EARNT, MONEY_LOST, MONEY_BORROWED, CARD_ROULETTE_WINS, CARD_ROULETTE_LOSES = load_game()  # Load both money and name from save file
 CARD_SUITS = ("♠", "♦", "♥", "♣") # creates suits for card deck creation
 USER_NAME_KNOWLEDGE = False
-CURRENT_GAME = 0 #1 = CR    2 = HL
 
 Confirm_Redo = ["✅ Confirm", "🔄 Redo"]
 Confirm_Cancel = ["✅ Confirm", "❌ Cancel"]
@@ -210,13 +204,14 @@ card_output = ""
 bet_amount = None
 user_bet = None
 bet_confirm = False
+user_bet_check = None
 
 CRPick = [
     "🟥 ⬛ Card Colour",
-    "♠️ ♦️ ♣️ ♥️ Card Suit",
-    "👑 A 🔟 Group cards",
+    "♠️ ♦️ ♣️ ♥️  Card Suit",
+    "👑 [A] 🔟 Group cards",
     "🃏 Certain Cards",
-    "🃏 ♠️ ♦️ ♣️ ♥️ Specific Cards",
+    "🃏 ♠️ ♦️ ♣️ ♥️  Specific Cards",
     "❌ Quit Game"
 
 ]
@@ -235,7 +230,8 @@ CRSuitsPick = [
 CRGroupPick = [
     f"👑 Face Cards {Colours.GREEN}x5{Colours.RESET} {Colours.YELLOW}[23.08%]{Colours.RESET}",
     f"🔟 Number Cards {Colours.GREEN}x1.5{Colours.RESET} {Colours.YELLOW}[76.92%]{Colours.RESET}",
-    f"A Ace Card {Colours.GREEN}x25{Colours.RESET} {Colours.YELLOW}[7.69%]{Colours.RESET}",
+    f"🔟 👑 👑 👑 [A] Royal Straight Cards {Colours.GREEN}x3{Colours.RESET} {Colours.YELLOW}[38.46%]{Colours.RESET}",
+    f"[A] [2] [3] [4] [5] Bicycle Cards {Colours.GREEN}x3{Colours.RESET} {Colours.YELLOW}[38.46%]{Colours.RESET}"
     "↩️ Back"
 ]
 CRCertainPick = [ #This can be done way more simpler but it eaiser to see all the options
@@ -374,8 +370,12 @@ def clear_screen():
     ''''clear screen function'''
     if os.name == 'posix':
         os.system('clear')
-    elif os.name == 'posix':
+    elif os.name == 'nt':
         os.system('cls')
+    else:
+        print("\n" * 50)
+    print('\033[2J\033[H', end='')
+    sys.stdout.flush()
 
 def is_float(variable):
     '''check if value is a float'''
@@ -425,6 +425,8 @@ def key_press(option):
             print(f"{Colours.RED}Press any key to continue{Colours.RESET}")
         elif option == 1:
             print(f"{Colours.RED}Press any key to return to menu{Colours.RESET}")
+        elif option == 2:
+            print(f"{Colours.GREEN}Your ${user_bet} is returned to you\n\n{Colours.RESET}{Colours.RED}Press any key to return to menu{Colours.RESET}")
 
         if os.name == "nt":
             msvcrt.getwch()
@@ -438,7 +440,7 @@ def key_press(option):
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return True
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Single Key Track----#
 
@@ -449,7 +451,7 @@ def arrow_key():
         if os.name == "nt":
             ch = msvcrt.getwch()
             if ch and ord(ch) == 3:
-                print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+                print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
                 sys.exit()
             if ch in ("\x00", "\xe0"):
                 ch2 = msvcrt.getwch()
@@ -472,10 +474,10 @@ def arrow_key():
                 key = sys.stdin.read(1)
 
                 if ord(key) == 3:  # CTRL-C
-                    print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")                    #
+                    print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")                    #
                     sys.exit()
                 elif ord(key) == 4:  # CTRL-D
-                    print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+                    print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
                     sys.exit()
 
                 if ord(key) == 27:  # ESC
@@ -485,7 +487,7 @@ def arrow_key():
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Arrow Key Track----#
 
@@ -497,22 +499,21 @@ def arrow_menu(title, text, options):
         while True:
             clear_screen()
             LINE()
-            if title is "gameCR":
-                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - CARD ROULETTE 🎰{Colours.RESET}")
-            elif title is "gameCRRedBlack":
-                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - CARD ROULETTE - CARD COLOUR PICK🎰{Colours.RESET}")
-            elif title is "gameHL":
-                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - HIGHS AND LOWS 🎰{Colours.RESET}")
-            elif title is "confirm-cancel":
-                if CURRENT_GAME == 1:
-                    print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - CARD ROULETTE - CONFIRM 🎰{Colours.RESET}")
-                elif CURRENT_GAME == 2:
-                    print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - HIGHS AND LOWS - CONFIRM 🎰{Colours.RESET}")
-            elif title is "menu":
-                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - MENU 🎰{Colours.RESET}")
+            if title == "gameCR":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 DUCK ROULETTE - CARD ROULETTE 🎰{Colours.RESET}")
+            elif title == "gameCRRedBlack":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 DUCK ROULETTE - CARD ROULETTE - CARD COLOUR PICK🎰{Colours.RESET}")
+            elif title == "confirm-cancel":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 DUCK ROULETTE - CARD ROULETTE - CONFIRM 🎰{Colours.RESET}")
+            elif title == "menu":
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 DUCK ROULETTE - MENU 🎰{Colours.RESET}")
+            elif title == "name":
+                print(f"{Colours.BOLD}{Colours.BLUE}🏷️  DUCK ROULETTE - NAME 🏷️{Colours.RESET}")
 
             LINE()
-            print(text)
+            if text is not None:
+                print(text)
+            
                 
             # Display menu options
             for i, option in enumerate(options):
@@ -541,7 +542,7 @@ def arrow_menu(title, text, options):
                 elif key == '\r' or key == '\n':  # Enter
                     return selected
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 
 #----Arrow Key Menu System----#
@@ -552,15 +553,21 @@ def start_game():
     try:
         clear_screen()
         LINE()
-        print(f"{Colours.BOLD}{Colours.BLUE}🎰 Counting Ducks 🎰{Colours.RESET}\n")
+        print(f"{Colours.BOLD}{Colours.BLUE}🎰 Duck Roulette 🎰{Colours.RESET}\n")
         if FILE_STATUS == 1:
             print(f"{Colours.BOLD}{Colours.GREEN}💾 Loaded Save File{Colours.RESET}")
         elif FILE_STATUS == 2:
             print(f"{Colours.BOLD}{Colours.YELLOW}💾 New Save File{Colours.RESET}")
         elif FILE_STATUS == 3:
             print(f"{Colours.BOLD}{Colours.RED}💾 Corrupted or Tampered Save File{Colours.RESET}")
+        if os.name == "nt":
+            print(f"{Colours.BOLD}{Colours.CYAN}🖥️  Windows Operating System{Colours.RESET}")
+        elif os.name == "posix":
+            print(f"{Colours.BOLD}{Colours.CYAN}🖥️  MacOS/Linux Operating System{Colours.RESET}")
+        else:
+            print(f"{Colours.BOLD}{Colours.CYAN}🖥️  Unknown Operating System{Colours.RESET}")
         print(f"{Colours.GREEN}💰 Your Money: ${USER_WALLET}{Colours.RESET}\n"
-        f"{Colours.CYAN}🎉 Welcome to Counting Ducks, a gambling game 🎉{Colours.RESET}")
+        f"{Colours.CYAN}🎉 Welcome to Duck Roulette, a gambling game combining roulette with a card deck 🎉{Colours.RESET}")
         if USER_NAME is None:
             print(f"{Colours.YELLOW}🏷️  Your  Name:{Colours.RESET}{Colours.RED} -UNKNOWN-{Colours.RESET}")
         else:
@@ -569,7 +576,7 @@ def start_game():
         key_press(1)
         clear_screen()
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Start Game----#
 
@@ -583,7 +590,7 @@ def financial_aid():
     try:
         clear_screen()
         LINE()
-        print(f"{Colours.BOLD}{Colours.BLUE}🏷️  COUNTING DUCKS - FINANCIAL AID 🏷️{Colours.RESET}")
+        print(f"{Colours.BOLD}{Colours.BLUE}🏷️  DUCK ROULETTE - FINANCIAL AID 🏷️{Colours.RESET}")
         LINE()
         print(f"{Colours.YELLOW}Due to you being {Colours.RED}BROKE{Colours.RESET}{Colours.YELLOW}, you are given {Colours.RESET}{Colours.GREEN}$10{Colours.RESET} {Colours.YELLOW}to hopefully sustain your gambling addiction\n")
         USER_WALLET += 10
@@ -593,8 +600,8 @@ def financial_aid():
         save_game()
         key_press(1)
     except (KeyboardInterrupt, EOFError):
-                    print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
-                    sys.exit()
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
+        sys.exit()
 #----financial aid----#
 
 #----Betting Check Function----#
@@ -613,31 +620,33 @@ def bet_check():
             bet_error = 0
             user_bet = None
             bet_confirm = False
+            user_bet_check = None
             while True:
                 clear_screen()
                 LINE()
-                print(f"{Colours.BOLD}{Colours.BLUE}🎰 COUNTING DUCKS - MAIN GAME - BET 🎰{Colours.RESET}")
+                print(f"{Colours.BOLD}{Colours.BLUE}🎰 DUCK ROULETTE - MAIN GAME - BET 🎰{Colours.RESET}")
                 LINE()
 
                 if bet_error == 1:
-                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet} - Please use a number ⚠️{Colours.RESET}")
+                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet_check} - Please use a number ⚠️{Colours.RESET}")
                 elif bet_error == 2:
-                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet} - Please enter a number equal or bigger than 0.01 ⚠️{Colours.RESET}")
+                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet_check} - Please enter a number equal or bigger than 0.01 ⚠️{Colours.RESET}")
                 elif bet_error == 3:
-                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet} - You are betting more money than you have in your wallet ⚠️{Colours.RESET}")
+                    print(f"{Colours.RED}⚠️ Invalid bet: {user_bet_check} - You are betting more money than you have in your wallet ⚠️{Colours.RESET}")
 
                 print(f"{Colours.GREEN}💰 Your Money: ${USER_WALLET}{Colours.RESET}\n"
                     f"{Colours.CYAN}💵  How much do you want to bet? (Min $0.01) 💵{Colours.RESET}")
                 bet_error = 0
                 try:
-                    user_bet = input(f"{Colours.BOLD}❯ {Colours.RESET}").strip()
+                    user_bet_check = input(f"{Colours.BOLD}❯ {Colours.RESET}").strip()
                 except (KeyboardInterrupt, EOFError):
-                    print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+                    print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
                     sys.exit()
                 
-                if is_float(user_bet):
-                    if money_valid(user_bet) and float(user_bet) >= 0.01:
-                        if float(user_bet) <= USER_WALLET:
+                if is_float(user_bet_check):
+                    if money_valid(user_bet_check) and float(user_bet_check) >= 0.01:
+                        if float(user_bet_check) <= USER_WALLET:
+                            user_bet = float(user_bet_check)
                             clear_screen()
                             choices = arrow_menu("menu",
                                 f"{Colours.GREEN}💵 You are betting: {Colours.WHITE}${user_bet}{Colours.RESET}\n{Colours.CYAN}✅ Please confirm bet amount ✅{Colours.RESET}\n",
@@ -645,8 +654,8 @@ def bet_check():
                             if choices == 0:
                                 clear_screen()
                                 bet_confirm = True
-                                USER_WALLET -= float(user_bet)
-                                bet_amount = float(user_bet)
+                                USER_WALLET -= user_bet
+                                bet_amount = user_bet
                                 break
                             elif choices == 1:
                                 clear_screen()
@@ -663,7 +672,7 @@ def bet_check():
                     bet_error = 1
                     clear_screen()
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 
 #----Betting check Function----#
@@ -678,7 +687,7 @@ def name_pick():
         try:
             clear_screen()
             LINE()
-            print(f"{Colours.BOLD}{Colours.BLUE}🏷️  COUNTING DUCKS - NAME 🏷️{Colours.RESET}")
+            print(f"{Colours.BOLD}{Colours.BLUE}🏷️  DUCK ROULETTE - NAME 🏷️{Colours.RESET}")
             LINE()
             print(f"{Colours.YELLOW}✏️  What would you like your name to be? ✏️{Colours.RESET}")
             if USER_NAME_KNOWLEDGE is False:
@@ -688,7 +697,7 @@ def name_pick():
             try:
                 USER_NAME = input(f"{Colours.BOLD}❯ {Colours.RESET}")
             except (KeyboardInterrupt, EOFError):
-                print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+                print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
                 sys.exit()
             
             clear_screen()
@@ -701,7 +710,7 @@ def name_pick():
                 continue  # Retry name input
                 
         except (KeyboardInterrupt, EOFError):
-            print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+            print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
             sys.exit()
 #----Name Function----#
 
@@ -711,17 +720,17 @@ def help_game():
     try:
         clear_screen()
         LINE()
-        print(f"{Colours.BOLD}{Colours.BLUE}❓  COUNTING DUCKS - HELP ❓{Colours.RESET}")
+        print(f"{Colours.BOLD}{Colours.BLUE}❓  DUCK ROULETTE - HELP ❓{Colours.RESET}")
         LINE()
 
-        print(f"{Colours.CYAN}\"Counting Ducks\" is a game containing multiple games inspired other casino games.\n\n{Colours.RESET}"
+        print(f"{Colours.CYAN}\"Duck Roulette\" is a gambling game inspired by the casino game, roulette, but using a deck of cards.\n\n{Colours.RESET}"
             f"{Colours.RED}IMPORTANT:{Colours.RESET} The {Colours.YELLOW}Jack{Colours.RESET} cards are replaced by {Colours.YELLOW}Ducks{Colours.RESET}"
             "In the first game, Card Roulette, when picking what type of card to bet on, you many need to choose multiple catagories"
         )
         LINE()
         key_press(1)
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Help----#
 
@@ -738,13 +747,16 @@ def show_stats():
         print(f"{Colours.GREEN}💰 Money: ${USER_WALLET}{Colours.RESET}\n"
             f"{Colours.YELLOW}🏷️  Name: {USER_NAME}{Colours.RESET}\n"
             f"{Colours.CYAN}🎮 Games Played: {GAMES_PLAYED}{Colours.RESET}\n"
-            #f"{Colours.GOLD}🏆 Wins Total: {WINS_TOTAL}{Colours.RESET}\n"
-            f"{Colours.RED}🪙 Broke Count: {MONEY_BORROWED}{Colours.RESET}"
-        ) 
+            f"{Colours.GREEN}💵 ⬆️  Money Earnt: {MONEY_EARNT}{Colours.RESET}\n"
+            f"{Colours.RED}💵 ⬇️  Money Lost: {MONEY_LOST}{Colours.RESET}\n"
+            f"{Colours.RED}💵 📉 Money Borrowed: {MONEY_BORROWED}{Colours.RESET}\n"
+            f"{Colours.GOLD}🎰 🏆 Card Roulette Wins: {CARD_ROULETTE_WINS}{Colours.RESET}\n"
+            f"{Colours.RED}🎰 🪦  Card Roulette Loses: {CARD_ROULETTE_LOSES}{Colours.RESET}"
+        )
         LINE()
         key_press(1)
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Stats----#
 
@@ -752,11 +764,14 @@ def show_stats():
 def card_roulette():
     """First game"""
     global USER_WALLET, user_bet
+    BetPick = None
     try:
+        bet_check()
         while True:
-            choices = arrow_menu("gameCR", (f"{Colours.CYAN}Pick what you would like to bet your ${user_bet} on{Colours.RESET}\n"), CRPick)
+            choices = arrow_menu("gameCR", (f"{Colours.CYAN}Pick what you would like to bet your {Colours.RESET}{Colours.GREEN}${user_bet}{Colours.RESET}{Colours.CYAN} on{Colours.RESET}\n"), CRPick)
             if choices == 0: # Card colour
-                choices = arrow_menu("gameCRRedBlack", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}colour{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRRedBlackPick)
+                choices = arrow_menu("gameCRRedBlack", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}colour{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRRedBlackPick)
+                BetGroup = "COLOUR"
                 if choices == 0:
                     BetPick = "RED"
                 elif choices == 1:
@@ -766,51 +781,218 @@ def card_roulette():
                 else:
                     continue
             elif choices == 1: # Card Suits
-                choices = arrow_menu("gameCRSuits", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}suit{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRSuitsPick)
+                choices = arrow_menu("gameCRSuits", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}suit{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRSuitsPick)
+                BetGroup = "SUIT"
                 if choices == 0:
-                    BetPick == "SPADE"
+                    BetPick = "SPADE"
                 elif choices == 1:
-                    BetPick == "DIAMOND"
+                    BetPick = "DIAMOND"
                 elif choices == 2:
-                    BetPick == "HEART"
+                    BetPick = "HEART"
                 elif choices == 3:
-                    BetPick == "CLUB"
+                    BetPick = "CLUB"
                 elif choices == 4 or choices == -1:
                     continue
                 else:
                     continue
             elif choices == 2: # Card Groups
-                choices = arrow_menu("gameCRGroups", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}group{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRGroupPick)
-
+                choices = arrow_menu("gameCRGroups", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}group{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRGroupPick)
+                BetGroup = "GROUP"
+                if choices == 0:
+                    BetPick = "FACE"
+                elif choices == 1:
+                    BetPick = "NUMBER"
+                elif choices == 2:
+                    BetPick = "ROYAL"
+                elif choices == 3:
+                    BetPick = "BICYCLE"
+                elif choices == 4 or choices == -1:
+                    continue
+                else:
+                    continue
             elif choices == 3: # Certain card
-                choices = arrow_menu("gameCRCertain", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}value{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRCertainPick)
-
+                choices = arrow_menu("gameCRCertain", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}value{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRCertainPick)
+                BetGroup = "CERTAIN"
+                if choices == 0:
+                    BetPick = "2"
+                elif choices == 1:
+                    BetPick = "3"
+                elif choices == 2:
+                    BetPick = "4"
+                elif choices == 3:
+                    BetPick = "5"
+                elif choices == 4:
+                    BetPick = "6"
+                elif choices == 5:
+                    BetPick = "7"
+                elif choices == 6:
+                    BetPick = "8"
+                elif choices == 7:
+                    BetPick = "9"
+                elif choices == 8:
+                    BetPick = "10"
+                elif choices == 9:
+                    BetPick = "D"
+                elif choices == 10:
+                    BetPick = "Q"
+                elif choices == 11:
+                    BetPick = "K"
+                elif choices == 12:
+                    BetPick = "A"
+                elif choices == 13 or choices == -1:
+                    continue
+                else:
+                    continue
             elif choices == 4: # Specific card
-                choices = arrow_menu("gameCRSpecific", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}card{Colours.RESET} you want to bet on{Colours.RESET}\n"), CRSpecificPick)
-                
+                while True:
+                    choices = arrow_menu("gameCRSpecific", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}suit{Colours.RESET}{Colours.CYAN} the card you want to bet has{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRSpecificPick)
+                    if choices == 0: # Spades
+                        choices = arrow_menu("gameCRSpecificSpades", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}card{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRSuitsSpades)
+                        BetGroup = "SSPECIFIC"
+                        if choices == 0:
+                            BetPick = "2SPADE"
+                        elif choices == 1:
+                            BetPick = "3SPADE"
+                        elif choices == 2:
+                            BetPick = "4SPADE"
+                        elif choices == 3:
+                            BetPick = "5SPADE"
+                        elif choices == 4:
+                            BetPick = "6SPADE"
+                        elif choices == 5:
+                            BetPick = "7SPADE"
+                        elif choices == 6:
+                            BetPick = "8SPADE"
+                        elif choices == 7:
+                            BetPick = "9SPADE"
+                        elif choices == 8:
+                            BetPick = "10SPADE"
+                        elif choices == 9:
+                            BetPick = "DSPADE"
+                        elif choices == 10:
+                            BetPick = "QSPADE"
+                        elif choices == 11:
+                            BetPick = "KSPADE"
+                        elif choices == 12:
+                            BetPick = "ASPADE"
+                        elif choices == 13 or choices == -1:
+                            continue
+                        else:
+                            continue
+                    elif choices == 1:# Diamonds
+                        choices = arrow_menu("gameCRSpecificDiamonds", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}card{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRSuitsDiamonds)
+                        BetGroup = "DSPECIFIC"
+                        if choices == 0:
+                            BetPick = "2DIAMOND"
+                        elif choices == 1:
+                            BetPick = "3DIAMOND"
+                        elif choices == 2:
+                            BetPick = "4DIAMOND"
+                        elif choices == 3:
+                            BetPick = "5DIAMOND"
+                        elif choices == 4:
+                            BetPick = "6DIAMOND"
+                        elif choices == 5:
+                            BetPick = "7DIAMOND"
+                        elif choices == 6:
+                            BetPick = "8DIAMOND"
+                        elif choices == 7:
+                            BetPick = "9DIAMOND"
+                        elif choices == 8:
+                            BetPick = "10DIAMOND"
+                        elif choices == 9:
+                            BetPick = "DDIAMOND"
+                        elif choices == 10:
+                            BetPick = "QDIAMOND"
+                        elif choices == 11:
+                            BetPick = "KDIAMOND"
+                        elif choices == 12:
+                            BetPick = "ADIAMOND"
+                        elif choices == 13 or choices == -1:
+                            continue
+                        else:
+                            continue
+                    elif choices == 2:# heart
+                        choices = arrow_menu("gameCRSpecificHearts", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}card{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRSuitsHearts)
+                        BetGroup = "HSPECIFIC"
+                        if choices == 0:
+                            BetPick = "2HEART"
+                        elif choices == 1:
+                            BetPick = "3HEART"
+                        elif choices == 2:
+                            BetPick = "4HEART"
+                        elif choices == 3:
+                            BetPick = "5HEART"
+                        elif choices == 4:
+                            BetPick = "6HEART"
+                        elif choices == 5:
+                            BetPick = "7HEART"
+                        elif choices == 6:
+                            BetPick = "8HEART"
+                        elif choices == 7:
+                            BetPick = "9HEART"
+                        elif choices == 8:
+                            BetPick = "10HEART"
+                        elif choices == 9:
+                            BetPick = "DHEART"
+                        elif choices == 10:
+                            BetPick = "QHEART"
+                        elif choices == 11:
+                            BetPick = "KHEART"
+                        elif choices == 12:
+                            BetPick = "AHEART"
+                        elif choices == 13 or choices == -1:
+                            continue
+                        else:
+                            continue
+                    elif choices == 3: #clubs
+                        choices = arrow_menu("gameCRSpecificClubs", (f"{Colours.CYAN}Pick which {Colours.RESET}{Colours.YELLOW}card{Colours.RESET}{Colours.CYAN} you want to bet on{Colours.RESET}\n\n{Colours.GREEN}x_{Colours.RESET} is the multiplier\n{Colours.YELLOW}[__%]{Colours.RESET} is the change of the bet being picked\n"), CRSuitsClubs)
+                        BetGroup = "CSPECIFIC"
+                        if choices == 0:
+                            BetPick = "2CLUB"
+                        elif choices == 1:
+                            BetPick = "3CLUB"
+                        elif choices == 2:
+                            BetPick = "4CLUB"
+                        elif choices == 3:
+                            BetPick = "5CLUB"
+                        elif choices == 4:
+                            BetPick = "6CLUB"
+                        elif choices == 5:
+                            BetPick = "7CLUB"
+                        elif choices == 6:
+                            BetPick = "8CLUB"
+                        elif choices == 7:
+                            BetPick = "9CLUB"
+                        elif choices == 8:
+                            BetPick = "10CLUB"
+                        elif choices == 9:
+                            BetPick = "DCLUB"
+                        elif choices == 10:
+                            BetPick = "QCLUB"
+                        elif choices == 11:
+                            BetPick = "KCLUB"
+                        elif choices == 12:
+                            BetPick = "ACLUB"
+                    elif choices == 4 or choices == -1:
+                        continue
+                    else:
+                        continue
             elif choices == 5: # Exit Game
+                key_press(2)
                 USER_WALLET += user_bet
                 user_bet = None
-                break
-            else: # Exit game 
+                return
+            else: # Exit game
+                key_press(2)
                 USER_WALLET += user_bet
                 user_bet = None
                 return
             clear_screen()
-        else:
-            return
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Game 1 - card roulette----#
-
-#----Game 2 - Highs and Lows----#
-
-
-
-
-
-#----Game 2 - Highs and Lows----#
 
 #----Main Menu----#
 def main_menu():
@@ -818,7 +1000,6 @@ def main_menu():
     try:
         options = [
             "🎮 Play Card Roulette",                                                #CHANE GAME NAMES
-            "🎮 Play High of Lows",
             "📊 View Statistics",
             "❓ Help", 
             "✏️  Change Name",
@@ -837,35 +1018,44 @@ def main_menu():
                 
                 if choice == 0:  # Play Card roulette game
                     clear_screen()                                                  # GAME 1
-                    CURRENT_GAME = 1
                     choice = arrow_menu("confirm-cancel", (f"{Colours.CYAN}Please confirm to play Card Roulette{Colours.RESET}\n"), Confirm_Cancel)
-                elif choice == 1: # Play Highs and Lows game
-                    clear_screen()                                                  # GAME 2
-                    CURRENT_GAME = 2
-                    choice = arrow_menu("confirm-cancel", (f"{Colours.CYAN}Please confirm to play Highs and Lows{Colours.RESET}\n"), Confirm_Cancel)
-                elif choice == 2:  # View Stats
+                    card_roulette()
+                elif choice == 1:  # View Stats
                     clear_screen()
                     show_stats()
-                elif choice == 3:  # tips
+                elif choice == 2:  # tips
                     clear_screen()
                     help_game()
-                elif choice == 4:  # Change name
+                elif choice == 3:  # Change name
                     clear_screen()
                     name_pick()
-                elif choice == 5:
+                elif choice == 4:
                     save_game()
                     clear_screen()
                     LINE()
-                    print(f"{Colours.BOLD}{Colours.BLUE}🏷️  COUNTING DUCKS - SAVE 🏷️{Colours.RESET}")
+                    print(f"{Colours.BOLD}{Colours.BLUE}🏷️  DUCK ROULETTE - SAVE 🏷️{Colours.RESET}")
                     LINE()
                     print(f"{Colours.GREEN}Game saved successfully{Colours.RESET}")
                     LINE()
                     key_press(1)
-                elif choice == 6 or choice == -1:  # Quit
+                elif choice == 5 or choice == -1:  # Quit
                     clear_screen()
                     print(f"{Colours.RED}Thanks for playing! Goodbye!{Colours.RESET}")
                     sys.exit()
     except (KeyboardInterrupt, EOFError):
-        print(f"\n{Colours.RED}Thanks for playing Counting Ducks{Colours.RESET}")
+        print(f"\n{Colours.RED}Thanks for playing Duck Roulette{Colours.RESET}")
         sys.exit()
 #----Main Menu----#
+
+#----GAME ----#
+def main():
+    """Main entry point for the game."""
+    clear_screen()
+    start_game()
+    if USER_NAME is None:
+        name_pick()
+    save_game()
+    main_menu()
+
+if __name__ == "__main__":
+    main()
